@@ -31,4 +31,20 @@ stdout.txt
 output.dxf
 
 # Dependencies
-vcpkg/ 
+vcpkg/
+
+# Specific large files
+vcpkg_installed/x64-windows/debug/bin/opencv_dnn4d.pdb
+vcpkg_installed/x64-windows/debug/lib/libprotobufd.lib
+build/vcpkg_installed/x64-windows/debug/bin/opencv_dnn4d.pdb
+build/vcpkg_installed/x64-windows/debug/lib/libprotobufd.lib
+vcpkg_installed/x64-windows/bin/libprotoc.pdb
+vcpkg_installed/x64-windows/lib/libprotobuf.lib
+build/vcpkg_installed/x64-windows/bin/libprotobuf.pdb
+build/vcpkg_installed/x64-windows/bin/libprotoc.pdb
+build/vcpkg_installed/x64-windows/lib/libprotobuf.lib
+vcpkg_installed/x64-windows/bin/libprotobuf.pdb
+build/vcpkg_installed/x64-windows/debug/bin/libprotobufd.pdb
+build/vcpkg_installed/x64-windows/debug/bin/libprotocd.pdb
+vcpkg_installed/x64-windows/debug/bin/libprotobufd.pdb
+vcpkg_installed/x64-windows/debug/bin/libprotocd.pdb 
