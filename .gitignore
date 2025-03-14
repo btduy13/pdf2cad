@@ -1,0 +1,34 @@
+# Build directory
+build/
+vcpkg_installed/
+
+# IDE files
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+
+# Binary files
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.ilk
+*.exp
+*.iobj
+*.ipdb
+
+# Logs and temporary files
+*.log
+*.dmp
+crash_report.txt
+stderr.txt
+stdout.txt
+output.dxf
+
+# Dependencies
+vcpkg/ 
