@@ -1,0 +1,13 @@
+{
+    "name": "pdf2cad",
+    "version": "1.0.0",
+    "dependencies": [
+        "opencv4",
+        {
+            "name": "poppler",
+            "version>=": "23.11.0"
+        },
+        "protobuf"
+    ],
+    "builtin-baseline": "117524bad2789b8aa6954324a1bee4bffb7d6d09"
+} 
