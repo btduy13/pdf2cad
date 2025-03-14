@@ -13,35 +13,36 @@
 #include <shlwapi.h>
 #pragma comment(lib, "shlwapi.lib")
 
-HANDLE hEventLog = NULL;
-
-bool has_suffix(const std::string& str, const std::string& suffix) {
-    return str.size() >= suffix.size() &&
-           str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
 void log(const char* format, ...) {
     char buffer[4096];
     va_list args;
     va_start(args, format);
     
-    // Format the message
-    vsnprintf(buffer, sizeof(buffer), format, args);
+    // Format the message with timestamp
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    int prefixLen = snprintf(buffer, sizeof(buffer), 
+        "[%04d-%02d-%02d %02d:%02d:%02d.%03d] ",
+        st.wYear, st.wMonth, st.wDay,
+        st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+    
+    vsnprintf(buffer + prefixLen, sizeof(buffer) - prefixLen, format, args);
     va_end(args);
     
-    // Write to stderr
-    fprintf(stderr, "%s\n", buffer);
-    fflush(stderr);
+    // Add newline
+    strcat(buffer, "\n");
+    
+    // Write to stdout
+    printf("%s", buffer);
+    fflush(stdout);
     
     // Write to Windows debug output
     OutputDebugStringA(buffer);
-    OutputDebugStringA("\n");
+}
 
-    // Write to Windows Event Log
-    if (hEventLog != NULL) {
-        const char* strings[1] = { buffer };
-        ReportEventA(hEventLog, EVENTLOG_INFORMATION_TYPE, 0, 0, NULL, 1, 0, strings, NULL);
-    }
+bool has_suffix(const std::string& str, const std::string& suffix) {
+    return str.size() >= suffix.size() &&
+           str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 void printUsage() {
@@ -49,13 +50,6 @@ void printUsage() {
 }
 
 int main(int argc, char* argv[]) {
-    // Register event source
-    hEventLog = RegisterEventSourceA(NULL, "PDF2CAD");
-    if (hEventLog == NULL) {
-        fprintf(stderr, "Failed to register event source: %lu\n", GetLastError());
-        return 1;
-    }
-
     int result = 1;  // Default to error
     try {
         log("pdf2cad starting...");
@@ -80,12 +74,11 @@ int main(int argc, char* argv[]) {
         log("Output file: %s", argv[2]);
 
         // Check if input file exists
-        FILE* testFile = fopen(argv[1], "rb");
-        if (testFile == nullptr) {
-            log("Error: Input file does not exist or cannot be opened: %s (%s)", argv[1], strerror(errno));
+        DWORD fileAttrs = GetFileAttributesA(argv[1]);
+        if (fileAttrs == INVALID_FILE_ATTRIBUTES) {
+            log("Error: Input file does not exist or cannot be opened: %s (Error: %lu)", argv[1], GetLastError());
             goto cleanup;
         }
-        fclose(testFile);
         log("Input file exists and is readable");
 
         std::string inputPath = argv[1];
@@ -149,11 +142,5 @@ int main(int argc, char* argv[]) {
     }
 
 cleanup:
-    // Deregister event source
-    if (hEventLog != NULL) {
-        DeregisterEventSource(hEventLog);
-        hEventLog = NULL;
-    }
-
     return result;
 } 
