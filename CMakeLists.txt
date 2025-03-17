@@ -10,23 +10,31 @@ set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
 find_package(OpenCV REQUIRED)
 find_package(protobuf CONFIG REQUIRED)
 
-# Set vcpkg root
-set(VCPKG_ROOT $ENV{VCPKG_ROOT})
-if(NOT VCPKG_ROOT)
-    set(VCPKG_ROOT "C:/vcpkg")
-endif()
-
-# Set vcpkg installed directory
-set(VCPKG_INSTALLED_DIR "${VCPKG_ROOT}/installed")
+# Find Poppler
+set(POPPLER_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows")
+find_library(POPPLER_CPP_LIBRARY
+    NAMES poppler-cpp
+    PATHS "${POPPLER_DIR}/lib"
+    REQUIRED
+)
+find_library(POPPLER_LIBRARY
+    NAMES poppler
+    PATHS "${POPPLER_DIR}/lib"
+    REQUIRED
+)
+find_path(POPPLER_INCLUDE_DIR
+    NAMES poppler-document.h
+    PATHS "${POPPLER_DIR}/include"
+    PATH_SUFFIXES "poppler/cpp"
+    REQUIRED
+)
 
 # Add include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${OpenCV_INCLUDE_DIRS}
-    ${VCPKG_INSTALLED_DIR}/x64-windows/include
-    ${VCPKG_ROOT}/buildtrees/poppler/src/er-24.03.0-8a01d026a0.clean/cpp
-    ${VCPKG_ROOT}/buildtrees/poppler/src/er-24.03.0-8a01d026a0.clean/poppler
-    ${VCPKG_ROOT}/buildtrees/poppler/x64-windows-rel/cpp
+    ${POPPLER_INCLUDE_DIR}
+    ${POPPLER_DIR}/include
 )
 
 # Add executable
@@ -39,15 +47,16 @@ add_executable(pdf2cad
 # Link libraries
 target_link_libraries(pdf2cad PRIVATE
     ${OpenCV_LIBS}
-    ${VCPKG_ROOT}/buildtrees/poppler/x64-windows-rel/cpp/poppler-cpp.lib
-    ${VCPKG_ROOT}/buildtrees/poppler/x64-windows-rel/poppler.lib
+    ${POPPLER_CPP_LIBRARY}
+    ${POPPLER_LIBRARY}
     protobuf::libprotobuf
 )
 
 # Copy DLLs to output directory
 add_custom_command(TARGET pdf2cad POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:pdf2cad>
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${VCPKG_ROOT}/buildtrees/poppler/x64-windows-rel/cpp/poppler-cpp.dll"
-        "${VCPKG_ROOT}/buildtrees/poppler/x64-windows-rel/poppler.dll"
+        "${POPPLER_DIR}/bin/poppler-cpp.dll"
+        "${POPPLER_DIR}/bin/poppler.dll"
         $<TARGET_FILE_DIR:pdf2cad>
 ) 

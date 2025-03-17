@@ -11,6 +11,7 @@
 #include <direct.h>
 #include <windows.h>
 #include <shlwapi.h>
+#include <fstream>
 #pragma comment(lib, "shlwapi.lib")
 
 void log(const char* format, ...) {
@@ -38,6 +39,13 @@ void log(const char* format, ...) {
     
     // Write to Windows debug output
     OutputDebugStringA(buffer);
+    
+    // Write to file
+    static std::ofstream logFile("C:/Users/USER/Desktop/pdf2cad/debug_log.txt", std::ios::app);
+    if (logFile.is_open()) {
+        logFile << buffer;
+        logFile.flush();
+    }
 }
 
 bool has_suffix(const std::string& str, const std::string& suffix) {
@@ -52,10 +60,12 @@ void printUsage() {
 int main(int argc, char* argv[]) {
     int result = 1;  // Default to error
     try {
+        std::cout << "pdf2cad starting..." << std::endl;
         log("pdf2cad starting...");
         
         // Check arguments
         if (argc != 3) {
+            std::cout << "Error: Invalid number of arguments" << std::endl;
             log("Error: Invalid number of arguments");
             printUsage();
             goto cleanup;
@@ -64,11 +74,15 @@ int main(int argc, char* argv[]) {
         // Get current directory
         char currentDir[MAX_PATH];
         if (_getcwd(currentDir, sizeof(currentDir)) == nullptr) {
+            std::cout << "Error: Failed to get current directory: " << strerror(errno) << std::endl;
             log("Error: Failed to get current directory: %s", strerror(errno));
             goto cleanup;
         }
         
         // Log current directory and files
+        std::cout << "Current directory: " << currentDir << std::endl;
+        std::cout << "Input file: " << argv[1] << std::endl;
+        std::cout << "Output file: " << argv[2] << std::endl;
         log("Current directory: %s", currentDir);
         log("Input file: %s", argv[1]);
         log("Output file: %s", argv[2]);
@@ -76,9 +90,11 @@ int main(int argc, char* argv[]) {
         // Check if input file exists
         DWORD fileAttrs = GetFileAttributesA(argv[1]);
         if (fileAttrs == INVALID_FILE_ATTRIBUTES) {
+            std::cout << "Error: Input file does not exist or cannot be opened: " << argv[1] << " (Error: " << GetLastError() << ")" << std::endl;
             log("Error: Input file does not exist or cannot be opened: %s (Error: %lu)", argv[1], GetLastError());
             goto cleanup;
         }
+        std::cout << "Input file exists and is readable" << std::endl;
         log("Input file exists and is readable");
 
         std::string inputPath = argv[1];

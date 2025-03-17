@@ -4,6 +4,7 @@
 #include "poppler-page-renderer.h"
 #include <locale>
 #include <codecvt>
+#include <opencv2/imgproc.hpp>
 
 // Forward declaration of the log function
 extern void log(const char* format, ...);
@@ -13,6 +14,38 @@ public:
     std::unique_ptr<poppler::document> doc;
     std::vector<VectorElement> vectorElements;
     std::vector<std::string> textElements;
+
+    void processPath(const std::vector<cv::Point>& contour, double scale) {
+        if (contour.size() < 2) return;
+
+        // Convert contour to line segments
+        for (size_t i = 1; i < contour.size(); ++i) {
+            VectorElement line;
+            line.type = VectorElement::Type::LINE;
+            line.points = {
+                static_cast<double>(contour[i-1].x) / scale,
+                static_cast<double>(contour[i-1].y) / scale,
+                static_cast<double>(contour[i].x) / scale,
+                static_cast<double>(contour[i].y) / scale
+            };
+            line.thickness = 1.0;
+            vectorElements.push_back(line);
+        }
+
+        // Close the path if it's a closed contour
+        if (cv::norm(contour.front() - contour.back()) < 2.0) {
+            VectorElement line;
+            line.type = VectorElement::Type::LINE;
+            line.points = {
+                static_cast<double>(contour.back().x) / scale,
+                static_cast<double>(contour.back().y) / scale,
+                static_cast<double>(contour.front().x) / scale,
+                static_cast<double>(contour.front().y) / scale
+            };
+            line.thickness = 1.0;
+            vectorElements.push_back(line);
+        }
+    }
 };
 
 PDFProcessor::PDFProcessor() : pimpl(std::make_unique<Impl>()) {
@@ -102,6 +135,13 @@ bool PDFProcessor::extractVectors() {
         int pageCount = pimpl->doc->pages();
         log("Processing %d pages for vector elements", pageCount);
 
+        poppler::page_renderer renderer;
+        renderer.set_render_hints(
+            poppler::page_renderer::antialiasing |
+            poppler::page_renderer::text_antialiasing |
+            poppler::page_renderer::text_hinting
+        );
+
         for (int i = 0; i < pageCount; ++i) {
             log("Processing page %d for vectors...", i + 1);
             std::unique_ptr<poppler::page> page(pimpl->doc->create_page(i));
@@ -114,28 +154,47 @@ bool PDFProcessor::extractVectors() {
             poppler::rectf pageSize = page->page_rect();
             log("Page %d size: %.2f x %.2f points", i + 1, pageSize.width(), pageSize.height());
 
-            // TODO: Implement actual vector extraction
-            // For now, just adding sample vector elements based on page size
-            VectorElement line;
-            line.type = VectorElement::Type::LINE;
-            line.points = {0.0, 0.0, pageSize.width(), pageSize.height()}; // Diagonal line
-            line.thickness = 1.0;
-            pimpl->vectorElements.push_back(line);
-            
-            log("Added diagonal line for page %d: (%.2f,%.2f) to (%.2f,%.2f)", 
-                i + 1, line.points[0], line.points[1], line.points[2], line.points[3]);
+            // Render page at high resolution for vector detection
+            double scale = 4.0;  // Render at 4x resolution for better edge detection
+            poppler::image img = renderer.render_page(page.get(), 
+                72.0 * scale, 72.0 * scale);  // 72 DPI * scale
 
-            // Add a rectangle outline
-            VectorElement rect;
-            rect.type = VectorElement::Type::RECTANGLE;
-            rect.points = {0.0, 0.0, pageSize.width(), pageSize.height()};
-            rect.thickness = 0.5;
-            pimpl->vectorElements.push_back(rect);
+            if (!img.is_valid()) {
+                log("Failed to render page %d", i + 1);
+                continue;
+            }
+
+            // Convert to OpenCV format for processing
+            cv::Mat image(img.height(), img.width(), CV_8UC4, 
+                const_cast<char*>(img.const_data()));
             
-            log("Added page outline rectangle for page %d", i + 1);
+            // Convert to grayscale
+            cv::Mat gray;
+            cv::cvtColor(image, gray, cv::COLOR_BGRA2GRAY);
+
+            // Edge detection
+            cv::Mat edges;
+            cv::Canny(gray, edges, 50, 150);
+
+            // Find contours
+            std::vector<std::vector<cv::Point>> contours;
+            cv::findContours(edges, contours, cv::RETR_LIST, 
+                cv::CHAIN_APPROX_TC89_KCOS);
+
+            log("Found %zu potential vector paths", contours.size());
+
+            // Process each contour
+            for (const auto& contour : contours) {
+                if (contour.size() >= 2) {  // Only process paths with at least 2 points
+                    pimpl->processPath(contour, scale);
+                }
+            }
+
+            log("Processed %zu vector paths on page %d", contours.size(), i + 1);
         }
         
-        log("Vector extraction complete. Found %zu vector elements", pimpl->vectorElements.size());
+        log("Vector extraction complete. Found %zu vector elements", 
+            pimpl->vectorElements.size());
         return true;
     } catch (const std::exception& e) {
         log("Exception while extracting vectors: %s", e.what());
